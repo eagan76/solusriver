@@ -1,0 +1,157 @@
+#!/bin/bash
+
+# Step 1: Install necessary dependencies
+echo "Installing build dependencies for River, Waybar, Rofi, and Kitty..."
+sudo eopkg install -y gcc g++ meson wlroots-devel wayland-devel wayland-protocols-devel libseat-devel libdrm-devel pango-devel gtk-layer-shell-devel cairo-devel jsoncpp-devel
+
+# Step 2: Install Rofi, Waybar, and Kitty terminal
+echo "Installing Rofi, Waybar, and Kitty terminal..."
+sudo eopkg install -y rofi waybar kitty
+
+# Step 3: Clone and install River
+echo "Cloning and installing River..."
+git clone https://github.com/riverwm/river.git
+cd river
+meson build
+ninja -C build
+sudo ninja -C build install
+cd ..
+
+# Step 4: Create a custom session file for GDM
+echo "Setting up River as a session in GDM..."
+sudo tee /usr/share/wayland-sessions/river.desktop > /dev/null <<EOF
+[Desktop Entry]
+Name=River
+Comment=River Window Manager
+Exec=/usr/local/bin/river
+Type=Application
+DesktopNames=river
+EOF
+
+# Step 5: Configure Waybar
+echo "Setting up Waybar configuration..."
+mkdir -p ~/.config/waybar
+tee ~/.config/waybar/config.json > /dev/null <<EOF
+{
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "margin": 10,
+    "modules-left": ["custom/solus", "workspaces"],
+    "modules-center": ["clock"],
+    "modules-right": ["custom/notifications"],
+
+    "custom/solus": {
+        "exec": "echo '󰀶'",
+        "return-type": "json",
+        "click": "rofi -show drun",
+        "tooltip": "Applications"
+    },
+    
+    "workspaces": {
+        "format": "{icon}",
+        "icon-map": {
+            "1": "", "2": "", "3": "", "4": "",
+            "5": "", "6": "", "7": "", "8": "", "9": ""
+        },
+        "on-click": "riverctl switch-to-workspace {name}",
+        "underline": true,
+        "max-icons": 9
+    },
+
+    "clock": {
+        "format": "{:%H:%M}",
+        "interval": 60
+    },
+
+    "custom/notifications": {
+        "exec": "notify-send 'No new notifications'",
+        "return-type": "json",
+        "click": "notify-send 'Checking notifications...'",
+        "tooltip": "Notifications"
+    },
+
+    "style": {
+        "bar": {
+            "background": "#000000CC",
+            "border-radius": 10,
+            "padding": 5
+        },
+        "separator": {
+            "background": "#000000CC"
+        }
+    }
+}
+EOF
+
+# Step 6: Configure Waybar style with monospace font
+tee ~/.config/waybar/style.css > /dev/null <<EOF
+* {
+    color: #ffffff;
+    font-family: "monospace";
+}
+
+#workspaces {
+    border-radius: 5px;
+}
+
+#custom-solus {
+    font-size: 18px;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+#custom-notifications {
+    font-size: 18px;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+#clock {
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 5px;
+}
+EOF
+
+# Step 7: Configure River keybindings
+echo "Configuring keybindings in River..."
+mkdir -p ~/.config/river
+tee ~/.config/river/init > /dev/null <<EOF
+# Keybindings for River
+
+# Open Kitty terminal with Control+Enter
+riverctl map normal Ctrl+Return spawn kitty
+
+# Open Rofi with Control+D
+riverctl map normal Ctrl+D spawn "rofi -show drun"
+
+# Close a window with Control+Q
+riverctl map normal Ctrl+Q close
+
+# Kill a window with Control+Shift+Q
+riverctl map normal Ctrl+Shift+Q kill
+
+# Move focused window with Control+Arrow Keys
+riverctl map normal Ctrl+Left send-to-output left
+riverctl map normal Ctrl+Right send-to-output right
+riverctl map normal Ctrl+Up send-to-workspace previous
+riverctl map normal Ctrl+Down send-to-workspace next
+EOF
+
+# Step 8: Set monospace as the default system font
+echo "Setting monospace font as the default across the system..."
+
+# GTK font settings for applications
+mkdir -p ~/.config/gtk-3.0
+echo '[Settings]' > ~/.config/gtk-3.0/settings.ini
+echo 'gtk-font-name=Monospace 11' >> ~/.config/gtk-3.0/settings.ini
+
+# Qt font settings for applications
+mkdir -p ~/.config/QtProject
+echo '[General]' > ~/.config/QtProject/qt5ct.conf
+echo 'font=Monospace,11,-1,5,50,0,0,0,0,0' >> ~/.config/QtProject/qt5ct.conf
+
+echo "Setup complete! River, Waybar, Rofi, and Kitty are installed and configured with custom keybindings, and monospace is set as the default system font."
+echo "You can select 'River' from the GDM login screen to start your new setup."
